@@ -58,7 +58,7 @@ func main() {
 
 	self, err := api.GetSelf(nil)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	for {
@@ -74,9 +74,9 @@ func main() {
 			rand.Seed(time.Now().Unix())
 			replyStr := replies[rand.Intn(len(replies))] + " RT @" + strings.ToLower(tweet.User.ScreenName) + " " + tweet.Text
 
-			t, err := api.PostTweet(truncateString(replyStr, 140), nil)
+			_, err := api.PostTweet(truncateString(replyStr, 140), nil)
 			if err != nil {
-				log.Println(t, err)
+				log.Println(err.Error())
 			}
 		}
 	}
