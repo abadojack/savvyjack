@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/abadojack/anaconda"
 )
@@ -40,9 +39,7 @@ func truncateString(s string, n int) string {
 	}
 
 	n -= 4
-	for !utf8.ValidString(s[:n]) {
-		n--
-	}
+
 	return s[:n] + "..."
 }
 
