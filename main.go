@@ -72,8 +72,8 @@ func (t *twitterAPI) correctPeopleOnTwitter(trackKey, ignoreKey string, replies 
 			} else {
 				log.Println("Reply posted successfuly.")
 
-				//Tweet only once every minute
-				time.Sleep(time.Minute)
+				//Tweet only once every 2 minutes
+				time.Sleep(2 * time.Minute)
 			}
 		}
 
