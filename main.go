@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/url"
@@ -11,25 +13,8 @@ import (
 	"github.com/abadojack/anaconda"
 )
 
-var replies = []string{
-	"CAPTAIN Jack Sparrow. Savvy?",
-	"CAPTAIN Jack Sparrow, if you please.",
-	"Captain... CAPTAIN Jack Sparrow.",
-	"Captain... Captain Jack Sparrow.",
-	"Captain Jack Sparrow, if you please.",
-	"I'm Captain Jack Sparrow. Savvy?",
-	"Captain Jack Sparrow.",
-	"There should be a 'Captain' in there somewhere.",
-	"I'm Captain Jack Sparrow!",
-	"That's not nice, you didn't call me 'Captain.'",
-}
-
-var api *anaconda.TwitterApi
-
-func init() {
-	anaconda.SetConsumerKey(os.Getenv("TWITTER_CONSUMER_KEY_SAVVY_JACK"))
-	anaconda.SetConsumerSecret(os.Getenv("TWITTER_CONSUMER_SECRET_SAVVY_JACK"))
-	api = anaconda.NewTwitterApi(os.Getenv("TWITTER_ACCESS_KEY_SAVVY_JACK"), os.Getenv("TWITTER_ACCESS_SECRET_SAVVY_JACK"))
+type twitterAPI struct {
+	api *anaconda.TwitterApi
 }
 
 //truncateString truncates string and adds 3 dots at the end.
@@ -43,38 +28,79 @@ func truncateString(s string, n int) string {
 	return s[:n] + "..."
 }
 
-func main() {
+// correctPeopleOnTwitter corrects people on Twitter :) by replying tweets which
+// contain trackKey with one of the replies.
+// e.g. You can use it to correct people who say 'Linux' instead of GNU/Linux.
+// Ignore tweets that contain ignoreKey ... in the case above this would be GNU.
+func (t *twitterAPI) correctPeopleOnTwitter(trackKey, ignoreKey string, replies []string) {
 	v := url.Values{
-		"track": []string{"Jack Sparrow"},
+		"track": []string{trackKey},
 	}
 
-	stream := api.PublicStreamFilter(v)
+	stream := t.api.PublicStreamFilter(v)
 	defer stream.Stop()
 
 	tweet := anaconda.Tweet{}
 
-	self, err := api.GetSelf(nil)
+	self, err := t.api.GetSelf(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Println("bot account handle: ", self.ScreenName)
+
 	for {
+		log.Println("Waiting for relevant tweet")
 		i := <-stream.C
 		tweet = i.(anaconda.Tweet)
+
 		//Do not reply to my own tweets
 		if strings.Compare(tweet.User.ScreenName, self.ScreenName) == 0 {
 			continue
 		}
 
-		//Ignore tweets that already contain 'captain'
-		if !strings.Contains(strings.ToLower(tweet.Text), "captain") {
+		//Ignore tweets that already contain ignoreKey
+		if !strings.Contains(strings.ToLower(tweet.Text), ignoreKey) {
 			rand.Seed(time.Now().Unix())
 			replyStr := replies[rand.Intn(len(replies))] + " RT @" + strings.ToLower(tweet.User.ScreenName) + " " + tweet.Text
 
-			_, err := api.PostTweet(truncateString(replyStr, 140), nil)
+			log.Println("Posting reply: ", replyStr)
+
+			_, err := t.api.PostTweet(truncateString(replyStr, 140), nil)
 			if err != nil {
 				log.Println(err.Error())
+			} else {
+				log.Println("Reply posted successfuly.")
+
+				//Tweet only once every minute
+				time.Sleep(time.Minute)
 			}
 		}
+
 	}
+}
+
+func main() {
+	//Replies is a wrapper for slice Replies
+	type Replies struct {
+		Replies []string
+	}
+
+	b, err := ioutil.ReadFile("replies.json")
+	if err != nil {
+		panic(err)
+	}
+
+	var replies Replies
+	err = json.Unmarshal(b, &replies)
+	if err != nil {
+		panic(err)
+	}
+
+	anaconda.SetConsumerKey(os.Getenv("TWITTER_CONSUMER_KEY_SAVVY_JACK"))
+	anaconda.SetConsumerSecret(os.Getenv("TWITTER_CONSUMER_SECRET_SAVVY_JACK"))
+	api := anaconda.NewTwitterApi(os.Getenv("TWITTER_ACCESS_KEY_SAVVY_JACK"), os.Getenv("TWITTER_ACCESS_SECRET_SAVVY_JACK"))
+
+	t := twitterAPI{api}
+	t.correctPeopleOnTwitter("Jack Sparrow", "captain", replies.Replies)
 }
